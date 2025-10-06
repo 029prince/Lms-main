@@ -16,12 +16,29 @@ const app = express();
 await connectDB();
 await connectCloudinary();
 
-// ✅ CORS Configuration
-//const allowedOrigins = ['https://lms-frontend-ivory-phi.vercel.app'];
-//const allowedOrigins = ['http://localhost:5173/'];
-app.use(cors())
+// ✅ CORS Configuration (Fixed)
+const allowedOrigins = [
+  'https://lms-main-bxng.vercel.app',
+  'http://localhost:5173'
+];
 
-// Clerk Middleware
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+// ✅ Middleware for parsing JSON (only once, globally)
+app.use(express.json());
+
+// ✅ Clerk Middleware (after express.json to ensure body is parsed)
 app.use(clerkMiddleware());
 
 // Routes
@@ -29,10 +46,11 @@ app.get('/', (req, res) => {
   res.send("API is working");
 });
 
-app.post('/clerk', express.json(), clerkWebhooks);
-app.use('/api/educator', express.json(), educatorRouter);
-app.use('/api/course', express.json(), courseRouter);
-app.use('/api/user', express.json(), userRouter);
+// ✅ Webhooks (stripe needs raw, others can use JSON)
+app.post('/clerk', clerkWebhooks);
+app.use('/api/educator', educatorRouter);
+app.use('/api/course', courseRouter);
+app.use('/api/user', userRouter);
 app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
 
 // Start server
